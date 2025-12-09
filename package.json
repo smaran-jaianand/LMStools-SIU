@@ -1,0 +1,16 @@
+{
+    "name": "lms-root",
+    "version": "1.0.0",
+    "description": "Root package for LMS project",
+    "scripts": {
+        "dev": "concurrently \"npm run server\" \"npm run client\"",
+        "server": "npm run dev --prefix server",
+        "client": "npm run dev --prefix client",
+        "install-all": "npm install && npm install --prefix server && npm install --prefix client"
+    },
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "concurrently": "^9.2.1"
+    }
+}
