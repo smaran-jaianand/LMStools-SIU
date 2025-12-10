@@ -74,4 +74,33 @@ router.get('/:courseId', async (req, res) => {
     }
 });
 
+// Get list of all courses
+router.get('/list/courses', async (req, res) => {
+    try {
+        // Group by courseId to get distinct courses
+        const courses = await Student.findAll({
+            attributes: ['courseId'],
+            group: ['courseId']
+        });
+
+        // In a real app we might want more metadata, but for now just the IDs
+        res.json(courses.map(c => ({ courseId: c.courseId })));
+    } catch (error) {
+        console.error('Error fetching courses:', error);
+        res.status(500).json({ error: 'Failed to fetch courses' });
+    }
+});
+
+// Delete course data
+router.delete('/:courseId', async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        await Student.destroy({ where: { courseId } });
+        res.json({ success: true, message: 'Course deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting course:', error);
+        res.status(500).json({ error: 'Failed to delete course' });
+    }
+});
+
 module.exports = router;
