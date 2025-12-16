@@ -3,6 +3,7 @@ import { X, Save, Plus, Trash2 } from 'lucide-react';
 
 export default function EditDataDialog({ courseId, isOpen, onClose }) {
     const [data, setData] = useState([]);
+    const [headers, setHeaders] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -17,7 +18,23 @@ export default function EditDataDialog({ courseId, isOpen, onClose }) {
             const response = await fetch(`http://localhost:3000/api/students/${courseId}`);
             if (response.ok) {
                 const result = await response.json();
-                setData(result);
+
+                let loadedData = [];
+                let loadedHeaders = [];
+
+                if (Array.isArray(result)) {
+                    loadedData = result;
+                    if (loadedData.length > 0) loadedHeaders = Object.keys(loadedData[0]);
+                } else {
+                    loadedData = result.students || [];
+                    loadedHeaders = result.headers || [];
+                    if (loadedHeaders.length === 0 && loadedData.length > 0) {
+                        loadedHeaders = Object.keys(loadedData[0]);
+                    }
+                }
+
+                setData(loadedData);
+                setHeaders(loadedHeaders);
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -33,7 +50,8 @@ export default function EditDataDialog({ courseId, isOpen, onClose }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     courseId: courseId,
-                    students: data
+                    students: data,
+                    headers: headers
                 })
             });
 
@@ -70,12 +88,16 @@ export default function EditDataDialog({ courseId, isOpen, onClose }) {
     const handleAddColumn = () => {
         const name = prompt("Enter column name:");
         if (name) {
+            if (!headers.includes(name)) {
+                setHeaders([...headers, name]);
+            }
             setData(data.map(row => ({ ...row, [name]: '' })));
         }
     };
 
     const handleRemoveColumn = (key) => {
         if (confirm(`Delete column ${key}?`)) {
+            setHeaders(headers.filter(h => h !== key));
             const newData = data.map(row => {
                 const newRow = { ...row };
                 delete newRow[key];
@@ -87,14 +109,15 @@ export default function EditDataDialog({ courseId, isOpen, onClose }) {
 
     // Derived headers from all rows to ensure we show all columns
     const allHeaders = React.useMemo(() => {
+        if (headers && headers.length > 0) return headers;
+
         if (!data || data.length === 0) return [];
         const uniqueKeys = new Set();
         data.forEach(row => {
             Object.keys(row).forEach(k => uniqueKeys.add(k));
         });
-        // Sort or prioritize known headers? For now just array
         return Array.from(uniqueKeys);
-    }, [data]);
+    }, [data, headers]);
 
     if (!isOpen) return null;
 

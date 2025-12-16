@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Upload, Plus, Trash2, X, RefreshCw } from 'lucide-react';
 import ExcelUploader from './ExcelUploader';
+import EmptyState from '../EmptyState';
 import { useCourseStore } from '../../store/courseStore';
 
 export default function CourseDetails() {
-    const { courseDetails, setCourseDetails, setStudentData, studentData: globalStudentData } = useCourseStore();
+    const { courseDetails, setCourseDetails, setStudentData, studentData: globalStudentData, headers, setHeaders } = useCourseStore();
     const [showUploader, setShowUploader] = useState(false);
 
     const handleChange = (e) => {
@@ -18,12 +19,32 @@ export default function CourseDetails() {
             try {
                 const response = await fetch(`http://localhost:3000/api/students/${courseDetails.courseCode}`);
                 if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.length > 0) {
-                        setStudentData(data);
+                    const result = await response.json();
+                    // Result can be array (legacy) or object { students, headers }
+                    let loadedData = [];
+                    let loadedHeaders = [];
+
+                    if (Array.isArray(result)) {
+                        loadedData = result;
+                        // Legacy: derive headers if needed, or let component handle empty
+                        if (loadedData.length > 0) loadedHeaders = Object.keys(loadedData[0]);
+                    } else {
+                        loadedData = result.students || [];
+                        loadedHeaders = result.headers || [];
+
+                        // Fallback if headers missing but data exists
+                        if (loadedHeaders.length === 0 && loadedData.length > 0) {
+                            loadedHeaders = Object.keys(loadedData[0]);
+                        }
+                    }
+
+                    if (loadedData && loadedData.length > 0) {
+                        setStudentData(loadedData);
+                        setHeaders(loadedHeaders);
                     } else {
                         alert("No data found for this course code.");
                         setStudentData([]);
+                        setHeaders([]);
                     }
                 }
             } catch (error) {
@@ -34,6 +55,7 @@ export default function CourseDetails() {
 
     const handleClearView = () => {
         setStudentData([]);
+        setHeaders([]);
         setCourseDetails(prev => ({
             ...prev,
             courseCode: '',
@@ -47,12 +69,16 @@ export default function CourseDetails() {
         }));
     };
 
-    const handleSaveStudents = async (dataToSave = globalStudentData, courseInfo = null) => {
+    const handleSaveStudents = async (dataToSave = globalStudentData, courseInfo = null, headersToSave = headers) => {
         // If courseInfo is provided (from Uploader), update local state
         let currentCourseId = courseDetails.courseCode;
         if (courseInfo) {
             setCourseDetails(prev => ({ ...prev, ...courseInfo }));
             currentCourseId = courseInfo.courseCode || courseDetails.courseCode;
+        }
+
+        if (headersToSave) {
+            setHeaders(headersToSave);
         }
 
         if (!currentCourseId) {
@@ -66,7 +92,9 @@ export default function CourseDetails() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     courseId: currentCourseId,
-                    students: dataToSave
+                    students: dataToSave,
+                    headers: headersToSave,
+                    courseInfo: courseInfo ? { ...courseDetails, ...courseInfo } : courseDetails
                 })
             });
 
@@ -108,17 +136,33 @@ export default function CourseDetails() {
 
     const handleAddColumn = () => {
         const columnName = prompt("Enter new column name:");
-        if (columnName && globalStudentData.length > 0) {
-            const newData = globalStudentData.map(row => ({
-                ...row,
-                [columnName]: ''
-            }));
-            setStudentData(newData);
+        if (columnName) {
+            // Add to headers if not present
+            if (!headers.includes(columnName)) {
+                setHeaders([...headers, columnName]);
+            }
+
+            if (globalStudentData.length > 0) {
+                const newData = globalStudentData.map(row => ({
+                    ...row,
+                    [columnName]: ''
+                }));
+                setStudentData(newData);
+            } else {
+                // Even if no data, we should allow adding structure? 
+                // Current logic relies on data existing for rows. 
+                // If no data, maybe we just init headers?
+                // But let's stick to existing pattern: logic applies when data present.
+            }
         }
     };
 
     const handleRemoveColumn = (keyToRemove) => {
         if (confirm(`Are you sure you want to delete column "${keyToRemove}"?`)) {
+            // Remove from headers
+            setHeaders(headers.filter(h => h !== keyToRemove));
+
+            // Remove from data
             const newData = globalStudentData.map(row => {
                 const newRow = { ...row };
                 delete newRow[keyToRemove];
@@ -323,45 +367,62 @@ export default function CourseDetails() {
                                     <thead>
                                         <tr className="bg-muted/50 border-b border-border">
                                             <th className="p-3 w-10 text-center text-muted-foreground">#</th>
-                                            {Object.keys(globalStudentData[0] || {}).map((header, i) => (
-                                                <th key={i} className="p-3 text-left font-semibold border-r border-border last:border-r-0 whitespace-nowrap group relative">
-                                                    {header}
-                                                    <button
-                                                        onClick={() => handleRemoveColumn(header)}
-                                                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10 p-0.5 rounded"
-                                                        title="Remove Column"
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                </th>
-                                            ))}
+                                            {(() => {
+                                                // Use explicit headers if available, otherwise fallback (mostly shouldn't happen if we manage state right)
+                                                let displayHeaders = headers;
+                                                if (!displayHeaders || displayHeaders.length === 0) {
+                                                    const allKeys = Object.keys(globalStudentData[0] || {});
+                                                    displayHeaders = allKeys;
+                                                }
+
+                                                return displayHeaders.map((header, i) => (
+                                                    <th key={header} className="p-3 text-left font-semibold border-r border-border last:border-r-0 whitespace-nowrap group relative">
+                                                        {header}
+                                                        <button
+                                                            onClick={() => handleRemoveColumn(header)}
+                                                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10 p-0.5 rounded"
+                                                            title="Remove Column"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </th>
+                                                ));
+                                            })()}
                                             <th className="p-3 w-10"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {globalStudentData.map((row, rowIndex) => (
-                                            <tr key={rowIndex} className="border-b border-border last:border-b-0 hover:bg-muted/20">
-                                                <td className="p-3 text-center text-muted-foreground">{rowIndex + 1}</td>
-                                                {Object.entries(row).map(([key, cell], colIndex) => (
-                                                    <td key={colIndex} className="p-2 border-r border-border last:border-r-0 min-w-[150px]">
-                                                        <input
-                                                            value={cell || ''}
-                                                            onChange={(e) => handleStudentDataChange(rowIndex, key, e.target.value)}
-                                                            className="w-full bg-transparent p-1 rounded hover:bg-background focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                                                        />
+                                        {globalStudentData.map((row, rowIndex) => {
+                                            // Use consistent headers
+                                            let displayHeaders = headers;
+                                            if (!displayHeaders || displayHeaders.length === 0) {
+                                                displayHeaders = Object.keys(globalStudentData[0] || {});
+                                            }
+
+                                            return (
+                                                <tr key={rowIndex} className="border-b border-border last:border-b-0 hover:bg-muted/20">
+                                                    <td className="p-3 text-center text-muted-foreground">{rowIndex + 1}</td>
+                                                    {displayHeaders.map((header, colIndex) => (
+                                                        <td key={header + colIndex} className="p-2 border-r border-border last:border-r-0 min-w-[150px]">
+                                                            <input
+                                                                value={row[header] || ''}
+                                                                onChange={(e) => handleStudentDataChange(rowIndex, header, e.target.value)}
+                                                                className="w-full bg-transparent p-1 rounded hover:bg-background focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                                                            />
+                                                        </td>
+                                                    ))}
+                                                    <td className="p-2 text-center">
+                                                        <button
+                                                            onClick={() => handleRemoveRow(rowIndex)}
+                                                            className="p-1 text-destructive hover:bg-destructive/10 rounded"
+                                                            title="Remove Row"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
                                                     </td>
-                                                ))}
-                                                <td className="p-2 text-center">
-                                                    <button
-                                                        onClick={() => handleRemoveRow(rowIndex)}
-                                                        className="p-1 text-destructive hover:bg-destructive/10 rounded"
-                                                        title="Remove Row"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -373,15 +434,11 @@ export default function CourseDetails() {
                     </div>
                 </>
             ) : (
-                <div className="flex flex-col items-center justify-center p-12 bg-muted/10 border-2 border-dashed border-border rounded-lg text-center animate-in fade-in zoom-in-95 duration-300">
-                    <div className="p-4 bg-muted mb-4 rounded-full">
-                        <Upload className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-xl font-semibold mb-2">No Data Displayed</h3>
-                    <p className="text-muted-foreground max-w-sm mb-6">
-                        Enter a Course Code and click "Retrieve Details" to view student information, or upload a new Excel file to get started.
-                    </p>
-                </div>
+                <EmptyState
+                    title="No Data Displayed"
+                    message="Enter a Course Code and click 'Retrieve Details' to view student information, or upload a new Excel file to get started."
+                    icon={Upload}
+                />
             )}
 
             {/* Previously: Student List Info Table was separate. Now merged into conditional block above */}

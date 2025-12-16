@@ -15,19 +15,24 @@ export const useCourseStore = create(
                 branch: ''
             },
             studentData: [],
+            headers: [], // explicit column order
             outcomes: [{ id: 1, statement: '', target: 60 }],
             questions: [{ id: 1, text: '', marks: '', co: '', bl: '' }],
+            assessments: [{ id: 1, text: '', marks: '', co: '', bl: '' }],
 
             setCourseDetails: (details) => set((state) => ({
                 courseDetails: { ...state.courseDetails, ...details }
             })),
 
             setStudentData: (data) => set({ studentData: data }),
+            setHeaders: (headers) => set({ headers }),
             setOutcomes: (outcomes) => set({ outcomes }),
             setQuestions: (questions) => set({ questions }),
+            setAssessments: (assessments) => set({ assessments }),
 
             coMarks: {},
             questionMarks: {},
+            assessmentMarks: {},
 
             setCoMark: (studentIndex, coId, mark) => set((state) => ({
                 coMarks: {
@@ -49,6 +54,16 @@ export const useCourseStore = create(
                 }
             })),
 
+            setAssessmentMark: (studentIndex, assessmentId, mark) => set((state) => ({
+                assessmentMarks: {
+                    ...state.assessmentMarks,
+                    [studentIndex]: {
+                        ...(state.assessmentMarks[studentIndex] || {}),
+                        [assessmentId]: mark
+                    }
+                }
+            })),
+
             reset: () => set({
                 courseDetails: {
                     academicYear: '',
@@ -61,10 +76,13 @@ export const useCourseStore = create(
                     branch: ''
                 },
                 studentData: [],
+                headers: [],
                 outcomes: [{ id: 1, statement: '', target: 60 }],
                 questions: [{ id: 1, text: '', marks: '', co: '', bl: '' }],
+                assessments: [{ id: 1, text: '', marks: '', co: '', bl: '' }],
                 coMarks: {},
-                questionMarks: {}
+                questionMarks: {},
+                assessmentMarks: {}
             })
         }),
         {

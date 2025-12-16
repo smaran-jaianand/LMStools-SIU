@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const ExcelJS = require('exceljs');
 const Student = require('../models/Student');
+const Course = require('../models/Course');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -35,11 +36,18 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 // Save student data
 router.post('/save', async (req, res) => {
     try {
-        const { courseId, students } = req.body;
+        const { courseId, students, headers, courseInfo } = req.body;
 
         if (!courseId || !students) {
             return res.status(400).json({ error: 'Missing courseId or students data' });
         }
+
+        // Upsert Course with headers and metadata
+        await Course.upsert({
+            courseId,
+            headers: headers || null,
+            metadata: courseInfo || null
+        });
 
         // Clear existing data for this course (optional, depending on requirement)
         await Student.destroy({ where: { courseId } });
@@ -64,10 +72,16 @@ router.get('/:courseId', async (req, res) => {
     try {
         const { courseId } = req.params;
         const students = await Student.findAll({ where: { courseId } });
+        const course = await Course.findByPk(courseId);
 
-        // Return just the data arrays
+        // Return just the data arrays match
         const data = students.map(s => s.data);
-        res.json(data);
+
+        // Return object with explicit headers if available
+        res.json({
+            students: data,
+            headers: course ? course.headers : null
+        });
     } catch (error) {
         console.error('Error fetching data:', error);
         res.status(500).json({ error: 'Failed to fetch data' });

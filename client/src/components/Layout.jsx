@@ -9,6 +9,7 @@ export default function Layout() {
         { path: '/course-details', label: 'Student List Information', icon: FileText },
         { path: '/course-outcomes', label: 'Course Outcomes', icon: FileText },
         { path: '/question-paper', label: 'Question Paper', icon: FileText },
+        { path: '/course-assessment', label: 'Course Assessment', icon: FileText },
         { path: '/imported-data', label: 'Imported Data Management', icon: LayoutDashboard },
     ];
 

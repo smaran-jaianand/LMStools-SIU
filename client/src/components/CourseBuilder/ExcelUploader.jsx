@@ -157,7 +157,7 @@ export default function ExcelUploader({ onSave, onClose }) {
             });
             return obj;
         });
-        onSave(formattedData, courseInfo);
+        onSave(formattedData, courseInfo, headers);
     };
 
     return (

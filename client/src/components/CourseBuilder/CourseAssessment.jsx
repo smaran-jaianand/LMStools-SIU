@@ -4,8 +4,9 @@ import { useCourseStore } from '../../store/courseStore';
 import { getStudentDisplayInfo } from '../../utils/studentHelpers';
 import EmptyState from '../EmptyState';
 
-export default function QuestionPaper() {
-    const { courseDetails, studentData, questions, setQuestions, questionMarks, setQuestionMark } = useCourseStore();
+export default function CourseAssessment() {
+    // Using 'assessments' and 'assessmentMarks' instead of 'questions' and 'questionMarks'
+    const { courseDetails, studentData, assessments, setAssessments, assessmentMarks, setAssessmentMark } = useCourseStore();
     const componentRef = useRef(null);
     const [isExporting, setIsExporting] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
@@ -14,15 +15,15 @@ export default function QuestionPaper() {
     // View state: 'list' -> 'options' -> 'builder' | 'marks'
     const [viewMode, setViewMode] = useState('list');
 
-    const handleQuestionChange = (id, field, value) => {
-        setQuestions(questions.map(q =>
-            q.id === id ? { ...q, [field]: value } : q
+    const handleAssessmentChange = (id, field, value) => {
+        setAssessments(assessments.map(a =>
+            a.id === id ? { ...a, [field]: value } : a
         ));
     };
 
-    const addQuestion = () => {
-        setQuestions([...questions, {
-            id: questions.length + 1,
+    const addAssessment = () => {
+        setAssessments([...assessments, {
+            id: assessments.length + 1,
             text: '',
             marks: '',
             co: '',
@@ -30,9 +31,9 @@ export default function QuestionPaper() {
         }]);
     };
 
-    const removeQuestion = (index) => {
-        const newQuestions = questions.filter((_, i) => i !== index);
-        setQuestions(newQuestions.map((q, i) => ({ ...q, id: i + 1 })));
+    const removeAssessment = (index) => {
+        const newAssessments = assessments.filter((_, i) => i !== index);
+        setAssessments(newAssessments.map((a, i) => ({ ...a, id: i + 1 })));
     };
 
     const handleExportPDF = async () => {
@@ -54,7 +55,7 @@ export default function QuestionPaper() {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'question-paper.pdf';
+                a.download = 'course-assessment.pdf';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -93,8 +94,8 @@ export default function QuestionPaper() {
     const renderList = () => (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <NavBlock
-                title="End Semester Question Paper"
-                subtitle="Manage Question Paper and Marks"
+                title="Course Assessment"
+                subtitle="Manage Assessment and Marks"
                 icon={FileText}
                 onClick={() => setViewMode('options')}
             />
@@ -107,13 +108,13 @@ export default function QuestionPaper() {
                 <button onClick={() => setViewMode('list')} className="text-muted-foreground hover:text-primary">
                     &larr; Back to List
                 </button>
-                <h2 className="text-xl font-semibold">End Semester Question Paper</h2>
+                <h2 className="text-xl font-semibold">Course Assessment</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <NavBlock
-                    title="QP Builder"
-                    subtitle="Create and edit questions"
+                    title="Assessment Builder"
+                    subtitle="Create and edit assessments"
                     icon={Edit}
                     onClick={() => setViewMode('builder')}
                 />
@@ -134,7 +135,7 @@ export default function QuestionPaper() {
                     <button onClick={() => setViewMode('options')} className="text-muted-foreground hover:text-primary">
                         &larr; Back
                     </button>
-                    <h2 className="text-xl font-semibold">QP Builder</h2>
+                    <h2 className="text-xl font-semibold">Assessment Builder</h2>
                 </div>
                 <div className="flex gap-2">
                     {!isSaved ? (
@@ -162,7 +163,7 @@ export default function QuestionPaper() {
                     </button>
                     {!isSaved && (
                         <button
-                            onClick={addQuestion}
+                            onClick={addAssessment}
                             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
                         >
                             <Plus size={16} /> Add Question
@@ -184,16 +185,16 @@ export default function QuestionPaper() {
                         </tr>
                     </thead>
                     <tbody>
-                        {questions.map((q, index) => (
+                        {assessments.map((a, index) => (
                             <tr key={index}>
-                                <td className="border border-border p-3 font-medium">Q{q.id}</td>
+                                <td className="border border-border p-3 font-medium">Q{a.id}</td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 whitespace-pre-wrap">{q.text || '-'}</div>
+                                        <div className="p-2 whitespace-pre-wrap">{a.text || '-'}</div>
                                     ) : (
                                         <textarea
-                                            value={q.text}
-                                            onChange={(e) => handleQuestionChange(q.id, 'text', e.target.value)}
+                                            value={a.text}
+                                            onChange={(e) => handleAssessmentChange(a.id, 'text', e.target.value)}
                                             placeholder="Enter Question here..."
                                             className="w-full p-2 rounded-md border border-input bg-background min-h-[60px] resize-y"
                                         />
@@ -201,12 +202,12 @@ export default function QuestionPaper() {
                                 </td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 text-center">{q.marks || '-'}</div>
+                                        <div className="p-2 text-center">{a.marks || '-'}</div>
                                     ) : (
                                         <input
                                             type="number"
-                                            value={q.marks}
-                                            onChange={(e) => handleQuestionChange(q.id, 'marks', e.target.value)}
+                                            value={a.marks}
+                                            onChange={(e) => handleAssessmentChange(a.id, 'marks', e.target.value)}
                                             placeholder="Marks"
                                             className="w-full p-2 rounded-md border border-input bg-background"
                                         />
@@ -214,12 +215,12 @@ export default function QuestionPaper() {
                                 </td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 text-center">{q.co || '-'}</div>
+                                        <div className="p-2 text-center">{a.co || '-'}</div>
                                     ) : (
                                         <input
                                             type="text"
-                                            value={q.co}
-                                            onChange={(e) => handleQuestionChange(q.id, 'co', e.target.value)}
+                                            value={a.co}
+                                            onChange={(e) => handleAssessmentChange(a.id, 'co', e.target.value)}
                                             placeholder="e.g. CO1"
                                             className="w-full p-2 rounded-md border border-input bg-background"
                                         />
@@ -227,12 +228,12 @@ export default function QuestionPaper() {
                                 </td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 text-center">{q.bl || '-'}</div>
+                                        <div className="p-2 text-center">{a.bl || '-'}</div>
                                     ) : (
                                         <input
                                             type="text"
-                                            value={q.bl}
-                                            onChange={(e) => handleQuestionChange(q.id, 'bl', e.target.value)}
+                                            value={a.bl}
+                                            onChange={(e) => handleAssessmentChange(a.id, 'bl', e.target.value)}
                                             placeholder="e.g. L2"
                                             className="w-full p-2 rounded-md border border-input bg-background"
                                         />
@@ -241,7 +242,7 @@ export default function QuestionPaper() {
                                 <td className="border border-border p-3 text-center">
                                     {!isSaved && (
                                         <button
-                                            onClick={() => removeQuestion(index)}
+                                            onClick={() => removeAssessment(index)}
                                             className="text-destructive hover:bg-destructive/10 p-2 rounded-md"
                                         >
                                             <Trash2 size={18} />
@@ -293,10 +294,10 @@ export default function QuestionPaper() {
                                     <th className="p-3 text-left font-semibold border-r border-border w-16">S.No</th>
                                     <th className="p-3 text-left font-semibold border-r border-border">Roll Number</th>
                                     <th className="p-3 text-left font-semibold border-r border-border">Student Name</th>
-                                    {/* Dynamic Question Columns */}
-                                    {questions.map((q) => (
-                                        <th key={q.id} className="p-3 text-center font-semibold border-r border-border w-16">
-                                            Q{q.id} ({q.marks || '-'})
+                                    {/* Dynamic Assessment Columns */}
+                                    {assessments.map((a) => (
+                                        <th key={a.id} className="p-3 text-center font-semibold border-r border-border w-16">
+                                            Q{a.id} ({a.marks || '-'})
                                         </th>
                                     ))}
                                 </tr>
@@ -309,16 +310,16 @@ export default function QuestionPaper() {
                                             <td className="p-3 border-r border-border w-16 text-center">{i + 1}</td>
                                             <td className="p-3 border-r border-border">{rollNumber || '-'}</td>
                                             <td className="p-3 border-r border-border">{name || '-'}</td>
-                                            {/* Dynamic Cells for Questions */}
-                                            {questions.map((q) => (
-                                                <td key={q.id} className="p-3 border-r border-border text-center min-w-[80px]">
+                                            {/* Dynamic Cells for Assessments */}
+                                            {assessments.map((a) => (
+                                                <td key={a.id} className="p-3 border-r border-border text-center min-w-[80px]">
                                                     {isMarksSaved ? (
-                                                        <span>{(questionMarks[i] && questionMarks[i][q.id]) || '-'}</span>
+                                                        <span>{(assessmentMarks[i] && assessmentMarks[i][a.id]) || '-'}</span>
                                                     ) : (
                                                         <input
                                                             type="number"
-                                                            value={(questionMarks[i] && questionMarks[i][q.id]) || ''}
-                                                            onChange={(e) => setQuestionMark(i, q.id, e.target.value)}
+                                                            value={(assessmentMarks[i] && assessmentMarks[i][a.id]) || ''}
+                                                            onChange={(e) => setAssessmentMark(i, a.id, e.target.value)}
                                                             className="w-full text-center p-1 border rounded-md"
                                                             placeholder=""
                                                         />
@@ -342,7 +343,7 @@ export default function QuestionPaper() {
 
     return (
         <div ref={componentRef} className="bg-card p-6 rounded-lg border border-border shadow-sm">
-            {/* Course Details Header - Always visible or only on top level? User didn't specify, but nice to keep context. */}
+            {/* Course Details Header */}
             {(courseDetails.courseCode || courseDetails.academicYear) && (
                 <div className="mb-6 bg-muted/30 p-4 rounded-md border border-border print-hidden">
                     <h3 className="font-semibold text-lg mb-2 text-primary">Course Information</h3>

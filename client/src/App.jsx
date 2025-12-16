@@ -4,6 +4,7 @@ import CourseDetailsPage from './pages/CourseDetailsPage';
 import CourseOutcomesPage from './pages/CourseOutcomesPage';
 import QuestionPaperPage from './pages/QuestionPaperPage';
 import ImportedDataPage from './pages/ImportedDataPage';
+import CourseAssessmentPage from './pages/CourseAssessmentPage';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="course-details" element={<CourseDetailsPage />} />
           <Route path="course-outcomes" element={<CourseOutcomesPage />} />
           <Route path="question-paper" element={<QuestionPaperPage />} />
+          <Route path="course-assessment" element={<CourseAssessmentPage />} />
           <Route path="imported-data" element={<ImportedDataPage />} />
         </Route>
       </Routes>
