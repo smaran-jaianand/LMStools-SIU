@@ -1,11 +1,21 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, FileText, Save, Edit } from 'lucide-react';
+import { Plus, Trash2, FileText, Save, Edit, ClipboardList } from 'lucide-react';
 import { useCourseStore } from '../../store/courseStore';
 import { getStudentDisplayInfo } from '../../utils/studentHelpers';
 import EmptyState from '../EmptyState';
 
 export default function QuestionPaper() {
-    const { courseDetails, studentData, questions, setQuestions, questionMarks, setQuestionMark } = useCourseStore();
+    const {
+        courseDetails,
+        studentData,
+        questionPapers,
+        addQuestionPaper,
+        removeQuestionPaper,
+        updateQuestionPaperName,
+        setQuestionPaperQuestions,
+        setQuestionPaperMark
+    } = useCourseStore();
+
     const componentRef = useRef(null);
     const [isExporting, setIsExporting] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
@@ -13,27 +23,75 @@ export default function QuestionPaper() {
 
     // View state: 'list' -> 'options' -> 'builder' | 'marks'
     const [viewMode, setViewMode] = useState('list');
+    const [selectedQpId, setSelectedQpId] = useState(null);
+
+    // Helpers to get current QP data
+    const currentQp = selectedQpId
+        ? questionPapers.find(q => q.id === selectedQpId)
+        : null;
+
+    const questions = currentQp ? currentQp.questions : [];
+    const questionMarks = currentQp ? currentQp.marks : {};
 
     const handleQuestionChange = (id, field, value) => {
-        setQuestions(questions.map(q =>
+        if (!currentQp) return;
+        const newQuestions = questions.map(q =>
             q.id === id ? { ...q, [field]: value } : q
-        ));
+        );
+        setQuestionPaperQuestions(currentQp.id, newQuestions);
     };
 
     const addQuestion = () => {
-        setQuestions([...questions, {
+        if (!currentQp) return;
+        const newQuestions = [...questions, {
             id: questions.length + 1,
             text: '',
             marks: '',
             co: '',
             bl: ''
-        }]);
+        }];
+        setQuestionPaperQuestions(currentQp.id, newQuestions);
     };
 
     const removeQuestion = (index) => {
-        const newQuestions = questions.filter((_, i) => i !== index);
-        setQuestions(newQuestions.map((q, i) => ({ ...q, id: i + 1 })));
+        if (!currentQp) return;
+        const newQuestions = questions.filter((_, i) => i !== index)
+            .map((q, i) => ({ ...q, id: i + 1 }));
+        setQuestionPaperQuestions(currentQp.id, newQuestions);
     };
+
+    const handleAddQp = () => {
+        const name = prompt("Enter Question Paper Name (e.g., Make-up Exam):");
+        if (name) {
+            addQuestionPaper(name);
+        }
+    };
+
+    const handleDeleteQp = (e, id) => {
+        e.stopPropagation();
+        if (confirm("Are you sure you want to delete this Question Paper?")) {
+            removeQuestionPaper(id);
+            if (selectedQpId === id) {
+                setViewMode('list');
+                setSelectedQpId(null);
+            }
+        }
+    };
+
+    const handleEditName = (currentName) => {
+        const newName = prompt("Edit Question Paper Name:", currentName);
+        if (newName && currentQp) {
+            updateQuestionPaperName(currentQp.id, newName);
+        }
+    }
+
+    const handleEditNameFromList = (e, id, currentName) => {
+        e.stopPropagation();
+        const newName = prompt("Edit Question Paper Name:", currentName);
+        if (newName) {
+            updateQuestionPaperName(id, newName);
+        }
+    }
 
     const handleExportPDF = async () => {
         if (!componentRef.current) return;
@@ -54,7 +112,7 @@ export default function QuestionPaper() {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'question-paper.pdf';
+                a.download = `question-paper-${currentQp?.name || 'export'}.pdf`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -71,11 +129,33 @@ export default function QuestionPaper() {
     };
 
     // Navigation Block Component
-    const NavBlock = ({ title, subtitle, icon: Icon, onClick }) => (
+    const NavBlock = ({ title, subtitle, icon: Icon, onClick, onDelete, onEdit }) => (
         <div
             onClick={onClick}
             className="bg-card hover:bg-accent/50 cursor-pointer border border-border p-6 rounded-lg shadow-sm transition-all group relative"
         >
+            {(onDelete || onEdit) && (
+                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {onEdit && (
+                        <button
+                            onClick={onEdit}
+                            className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                            title="Edit Name"
+                        >
+                            <Edit className="w-4 h-4" />
+                        </button>
+                    )}
+                    {onDelete && (
+                        <button
+                            onClick={onDelete}
+                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            )}
             <div className="flex items-center gap-4 mb-3">
                 <div className="p-3 bg-primary/10 rounded-full text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                     <Icon className="w-6 h-6" />
@@ -91,23 +171,59 @@ export default function QuestionPaper() {
     // --- VIEW Render Functions ---
 
     const renderList = () => (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <NavBlock
-                title="End Semester Question Paper"
-                subtitle="Manage Question Paper and Marks"
-                icon={FileText}
-                onClick={() => setViewMode('options')}
-            />
+        <div className="space-y-6">
+            <div className="flex justify-end">
+                <button
+                    onClick={handleAddQp}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
+                >
+                    <Plus size={16} /> Add New QP
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {questionPapers.map(qp => (
+                    <NavBlock
+                        key={qp.id}
+                        title={qp.name}
+                        subtitle="Manage Question Paper and Marks"
+                        icon={FileText}
+                        onClick={() => {
+                            setSelectedQpId(qp.id);
+                            setViewMode('options');
+                        }}
+                        onEdit={(e) => handleEditNameFromList(e, qp.id, qp.name)}
+                        onDelete={(e) => handleDeleteQp(e, qp.id)}
+                    />
+                ))}
+                {questionPapers.length === 0 && (
+                    <div className="col-span-full text-center py-10 text-muted-foreground">
+                        No Question Papers created. Click "Add New QP" to start.
+                    </div>
+                )}
+            </div>
         </div>
     );
 
     const renderOptions = () => (
         <div className="space-y-6">
             <div className="flex items-center gap-2">
-                <button onClick={() => setViewMode('list')} className="text-muted-foreground hover:text-primary">
+                <button onClick={() => {
+                    setViewMode('list');
+                    setSelectedQpId(null);
+                }} className="text-muted-foreground hover:text-primary">
                     &larr; Back to List
                 </button>
-                <h2 className="text-xl font-semibold">End Semester Question Paper</h2>
+                <div className="flex items-center gap-2 group">
+                    <h2 className="text-xl font-semibold">{currentQp?.name}</h2>
+                    <button
+                        onClick={() => handleEditName(currentQp?.name)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-opacity"
+                        title="Edit Name"
+                    >
+                        <Edit size={16} />
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -134,7 +250,16 @@ export default function QuestionPaper() {
                     <button onClick={() => setViewMode('options')} className="text-muted-foreground hover:text-primary">
                         &larr; Back
                     </button>
-                    <h2 className="text-xl font-semibold">QP Builder</h2>
+                    <div className="flex items-center gap-2 group">
+                        <h2 className="text-xl font-semibold">{currentQp?.name} - Builder</h2>
+                        <button
+                            onClick={() => handleEditName(currentQp?.name)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-opacity"
+                            title="Edit Name"
+                        >
+                            <Edit size={16} />
+                        </button>
+                    </div>
                 </div>
                 <div className="flex gap-2">
                     {!isSaved ? (
@@ -263,7 +388,16 @@ export default function QuestionPaper() {
                     <button onClick={() => setViewMode('options')} className="text-muted-foreground hover:text-primary">
                         &larr; Back
                     </button>
-                    <h3 className="text-xl font-semibold">Student List vs Marks</h3>
+                    <div className="flex items-center gap-2 group">
+                        <h3 className="text-xl font-semibold">{currentQp?.name} - Marks</h3>
+                        <button
+                            onClick={() => handleEditName(currentQp?.name)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-opacity"
+                            title="Edit Name"
+                        >
+                            <Edit size={16} />
+                        </button>
+                    </div>
                 </div>
                 <div>
                     {!isMarksSaved ? (
@@ -318,7 +452,7 @@ export default function QuestionPaper() {
                                                         <input
                                                             type="number"
                                                             value={(questionMarks[i] && questionMarks[i][q.id]) || ''}
-                                                            onChange={(e) => setQuestionMark(i, q.id, e.target.value)}
+                                                            onChange={(e) => setQuestionPaperMark(currentQp.id, i, q.id, e.target.value)}
                                                             className="w-full text-center p-1 border rounded-md"
                                                             placeholder=""
                                                         />
@@ -342,7 +476,7 @@ export default function QuestionPaper() {
 
     return (
         <div ref={componentRef} className="bg-card p-6 rounded-lg border border-border shadow-sm">
-            {/* Course Details Header - Always visible or only on top level? User didn't specify, but nice to keep context. */}
+            {/* Course Details Header */}
             {(courseDetails.courseCode || courseDetails.academicYear) && (
                 <div className="mb-6 bg-muted/30 p-4 rounded-md border border-border print-hidden">
                     <h3 className="font-semibold text-lg mb-2 text-primary">Course Information</h3>

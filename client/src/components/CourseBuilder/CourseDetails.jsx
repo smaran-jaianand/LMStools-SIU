@@ -3,9 +3,19 @@ import { Upload, Plus, Trash2, X, RefreshCw } from 'lucide-react';
 import ExcelUploader from './ExcelUploader';
 import EmptyState from '../EmptyState';
 import { useCourseStore } from '../../store/courseStore';
+import CollapsibleSection from '../CollapsibleSection';
 
 export default function CourseDetails() {
-    const { courseDetails, setCourseDetails, setStudentData, studentData: globalStudentData, headers, setHeaders } = useCourseStore();
+    const {
+        courseDetails,
+        setCourseDetails,
+        setStudentData,
+        studentData: globalStudentData,
+        headers,
+        setHeaders,
+        courseAssessments,
+        questionPapers
+    } = useCourseStore();
     const [showUploader, setShowUploader] = useState(false);
 
     const handleChange = (e) => {
@@ -148,11 +158,6 @@ export default function CourseDetails() {
                     [columnName]: ''
                 }));
                 setStudentData(newData);
-            } else {
-                // Even if no data, we should allow adding structure? 
-                // Current logic relies on data existing for rows. 
-                // If no data, maybe we just init headers?
-                // But let's stick to existing pattern: logic applies when data present.
             }
         }
     };
@@ -170,6 +175,12 @@ export default function CourseDetails() {
             });
             setStudentData(newData);
         }
+    };
+
+    const calculateTotalMarks = (studentIndex, assessmentData) => {
+        if (!assessmentData || !assessmentData.marks || !assessmentData.marks[studentIndex]) return 0;
+        const studentMarks = assessmentData.marks[studentIndex];
+        return Object.values(studentMarks).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
     };
 
     return (
@@ -296,141 +307,180 @@ export default function CourseDetails() {
             {/* Retrieved Data Table - Showing Live Store Data */}
             {(courseDetails.courseCode || globalStudentData.length > 0) ? (
                 <>
-                    <div className="space-y-6 bg-card p-6 rounded-lg border border-border shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
-                        <div className="flex justify-between items-center border-b border-border pb-4">
-                            <h2 className="text-xl font-semibold">Student List Information Table</h2>
-                            <button
-                                onClick={handleClearView}
-                                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
-                            >
-                                <RefreshCw className="w-4 h-4" /> Reset View
-                            </button>
-                        </div>
-
-                        <div className="overflow-hidden rounded-lg border border-border">
-                            <table className="w-full border-collapse bg-background text-sm">
-                                <tbody>
-                                    <tr className="border-b border-border">
-                                        <td className="p-3 font-semibold bg-muted/50 w-1/4 border-r border-border">Academic Year</td>
-                                        <td className="p-3 w-1/4 border-r border-border">{courseDetails.academicYear || '-'}</td>
-                                        <td className="p-3 font-semibold bg-muted/50 w-1/4 border-r border-border">Batch</td>
-                                        <td className="p-3 w-1/4">{courseDetails.batch || '-'}</td>
-                                    </tr>
-                                    <tr className="border-b border-border">
-                                        <td className="p-3 font-semibold bg-muted/50 border-r border-border">Examination Season</td>
-                                        <td className="p-3 border-r border-border">{courseDetails.examSeason || '-'}</td>
-                                        <td className="p-3 font-semibold bg-muted/50 border-r border-border">Course Code</td>
-                                        <td className="p-3">{courseDetails.courseCode || '-'}</td>
-                                    </tr>
-                                    <tr className="border-b border-border">
-                                        <td className="p-3 font-semibold bg-muted/50 border-r border-border">Semester</td>
-                                        <td className="p-3 border-r border-border">{courseDetails.semester || '-'}</td>
-                                        <td className="p-3 font-semibold bg-muted/50 border-r border-border">Credits</td>
-                                        <td className="p-3">{courseDetails.credits || '-'}</td>
-                                    </tr>
-                                    <tr className="border-b border-border">
-                                        <td className="p-3 font-semibold bg-muted/50 border-r border-border">Branch</td>
-                                        <td colSpan="3" className="p-3">{courseDetails.branch || '-'}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="p-3 font-semibold bg-muted/50 border-r border-border">Faculty Name</td>
-                                        <td colSpan="3" className="p-3">{courseDetails.facultyName || '-'}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Student Data Section */}
-                    <div className="space-y-6 bg-card p-6 rounded-lg border border-border shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
-                        <div className="flex justify-between items-center border-b border-border pb-4">
-                            <h2 className="text-xl font-semibold">Student Data</h2>
-                            <div className="flex gap-2">
-                                <button onClick={handleAddColumn} className="flex items-center gap-1 text-xs bg-secondary hover:bg-secondary/80 text-secondary-foreground px-2 py-1 rounded">
-                                    <Plus className="w-3 h-3" /> Col
-                                </button>
-                                <button onClick={handleAddRow} className="flex items-center gap-1 text-xs bg-secondary hover:bg-secondary/80 text-secondary-foreground px-2 py-1 rounded">
-                                    <Plus className="w-3 h-3" /> Row
-                                </button>
+                    <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                        <CollapsibleSection
+                            title="Student List Information Table"
+                            rightElement={
                                 <button
-                                    onClick={() => handleSaveStudents(globalStudentData)}
-                                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+                                    onClick={handleClearView}
+                                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors px-2 py-1"
                                 >
-                                    Save Changes
+                                    <RefreshCw className="w-4 h-4" /> Reset View
                                 </button>
-                            </div>
-                        </div>
-
-                        {globalStudentData && globalStudentData.length > 0 ? (
-                            <div className="overflow-x-auto rounded-lg border border-border">
+                            }
+                        >
+                            <div className="overflow-hidden rounded-lg border border-border">
                                 <table className="w-full border-collapse bg-background text-sm">
-                                    <thead>
-                                        <tr className="bg-muted/50 border-b border-border">
-                                            <th className="p-3 w-10 text-center text-muted-foreground">#</th>
-                                            {(() => {
-                                                // Use explicit headers if available, otherwise fallback (mostly shouldn't happen if we manage state right)
-                                                let displayHeaders = headers;
-                                                if (!displayHeaders || displayHeaders.length === 0) {
-                                                    const allKeys = Object.keys(globalStudentData[0] || {});
-                                                    displayHeaders = allKeys;
-                                                }
-
-                                                return displayHeaders.map((header, i) => (
-                                                    <th key={header} className="p-3 text-left font-semibold border-r border-border last:border-r-0 whitespace-nowrap group relative">
-                                                        {header}
-                                                        <button
-                                                            onClick={() => handleRemoveColumn(header)}
-                                                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10 p-0.5 rounded"
-                                                            title="Remove Column"
-                                                        >
-                                                            <X className="w-3 h-3" />
-                                                        </button>
-                                                    </th>
-                                                ));
-                                            })()}
-                                            <th className="p-3 w-10"></th>
-                                        </tr>
-                                    </thead>
                                     <tbody>
-                                        {globalStudentData.map((row, rowIndex) => {
-                                            // Use consistent headers
-                                            let displayHeaders = headers;
-                                            if (!displayHeaders || displayHeaders.length === 0) {
-                                                displayHeaders = Object.keys(globalStudentData[0] || {});
-                                            }
-
-                                            return (
-                                                <tr key={rowIndex} className="border-b border-border last:border-b-0 hover:bg-muted/20">
-                                                    <td className="p-3 text-center text-muted-foreground">{rowIndex + 1}</td>
-                                                    {displayHeaders.map((header, colIndex) => (
-                                                        <td key={header + colIndex} className="p-2 border-r border-border last:border-r-0 min-w-[150px]">
-                                                            <input
-                                                                value={row[header] || ''}
-                                                                onChange={(e) => handleStudentDataChange(rowIndex, header, e.target.value)}
-                                                                className="w-full bg-transparent p-1 rounded hover:bg-background focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                                                            />
-                                                        </td>
-                                                    ))}
-                                                    <td className="p-2 text-center">
-                                                        <button
-                                                            onClick={() => handleRemoveRow(rowIndex)}
-                                                            className="p-1 text-destructive hover:bg-destructive/10 rounded"
-                                                            title="Remove Row"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
+                                        <tr className="border-b border-border">
+                                            <td className="p-3 font-semibold bg-muted/50 w-1/4 border-r border-border">Academic Year</td>
+                                            <td className="p-3 w-1/4 border-r border-border">{courseDetails.academicYear || '-'}</td>
+                                            <td className="p-3 font-semibold bg-muted/50 w-1/4 border-r border-border">Batch</td>
+                                            <td className="p-3 w-1/4">{courseDetails.batch || '-'}</td>
+                                        </tr>
+                                        <tr className="border-b border-border">
+                                            <td className="p-3 font-semibold bg-muted/50 border-r border-border">Examination Season</td>
+                                            <td className="p-3 border-r border-border">{courseDetails.examSeason || '-'}</td>
+                                            <td className="p-3 font-semibold bg-muted/50 border-r border-border">Course Code</td>
+                                            <td className="p-3">{courseDetails.courseCode || '-'}</td>
+                                        </tr>
+                                        <tr className="border-b border-border">
+                                            <td className="p-3 font-semibold bg-muted/50 border-r border-border">Semester</td>
+                                            <td className="p-3 border-r border-border">{courseDetails.semester || '-'}</td>
+                                            <td className="p-3 font-semibold bg-muted/50 border-r border-border">Credits</td>
+                                            <td className="p-3">{courseDetails.credits || '-'}</td>
+                                        </tr>
+                                        <tr className="border-b border-border">
+                                            <td className="p-3 font-semibold bg-muted/50 border-r border-border">Branch</td>
+                                            <td colSpan="3" className="p-3">{courseDetails.branch || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-3 font-semibold bg-muted/50 border-r border-border">Faculty Name</td>
+                                            <td colSpan="3" className="p-3">{courseDetails.facultyName || '-'}</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
-                        ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                                No student data available. Upload an Excel file to populate this table or Retrieve existing data.
-                            </div>
-                        )}
+                        </CollapsibleSection>
+                    </div>
+
+                    {/* Student Data Section */}
+                    <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                        <CollapsibleSection
+                            title="Student Data"
+                            rightElement={
+                                <div className="flex gap-2">
+                                    <button onClick={handleAddColumn} className="flex items-center gap-1 text-xs bg-secondary hover:bg-secondary/80 text-secondary-foreground px-2 py-1 rounded">
+                                        <Plus className="w-3 h-3" /> Col
+                                    </button>
+                                    <button onClick={handleAddRow} className="flex items-center gap-1 text-xs bg-secondary hover:bg-secondary/80 text-secondary-foreground px-2 py-1 rounded">
+                                        <Plus className="w-3 h-3" /> Row
+                                    </button>
+                                    <button
+                                        onClick={() => handleSaveStudents(globalStudentData)}
+                                        className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+                                    >
+                                        Save Changes
+                                    </button>
+                                </div>
+                            }
+                        >
+                            {globalStudentData && globalStudentData.length > 0 ? (
+                                <div className="overflow-x-auto rounded-lg border border-border">
+                                    <table className="w-full border-collapse bg-background text-sm">
+                                        <thead>
+                                            <tr className="bg-muted/50 border-b border-border">
+                                                <th className="p-3 w-10 text-center text-muted-foreground">#</th>
+                                                {(() => {
+                                                    // Use explicit headers if available, otherwise fallback (mostly shouldn't happen if we manage state right)
+                                                    let displayHeaders = headers;
+                                                    if (!displayHeaders || displayHeaders.length === 0) {
+                                                        const allKeys = Object.keys(globalStudentData[0] || {});
+                                                        displayHeaders = allKeys;
+                                                    }
+
+                                                    // Filter out S.No columns case-insensitively
+                                                    displayHeaders = displayHeaders.filter(h => !/^(s\.?no\.?|serial\s*number|#)$/i.test(h));
+
+                                                    return displayHeaders.map((header, i) => (
+                                                        <th key={header} className="p-3 text-left font-semibold border-r border-border last:border-r-0 whitespace-nowrap group relative">
+                                                            {header}
+                                                            <button
+                                                                onClick={() => handleRemoveColumn(header)}
+                                                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10 p-0.5 rounded"
+                                                                title="Remove Column"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </th>
+                                                    ));
+                                                })()}
+
+                                                {/* Dynamic CA Columns */}
+                                                {courseAssessments.map((ca, i) => (
+                                                    <th key={`ca-head-${ca.id}`} className="p-3 text-center font-semibold border-r border-border whitespace-nowrap bg-blue-50/50">
+                                                        <div title={ca.name}>CA {i + 1}</div>
+                                                    </th>
+                                                ))}
+
+                                                {/* Dynamic QP Columns */}
+                                                {questionPapers.map((qp, i) => (
+                                                    <th key={`qp-head-${qp.id}`} className="p-3 text-center font-semibold border-r border-border whitespace-nowrap bg-purple-50/50">
+                                                        <div title={qp.name}>QP {i + 1}</div>
+                                                    </th>
+                                                ))}
+
+                                                <th className="p-3 w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {globalStudentData.map((row, rowIndex) => {
+                                                // Use consistent headers
+                                                let displayHeaders = headers;
+                                                if (!displayHeaders || displayHeaders.length === 0) {
+                                                    displayHeaders = Object.keys(globalStudentData[0] || {});
+                                                }
+                                                // Filter out S.No
+                                                displayHeaders = displayHeaders.filter(h => !/^(s\.?no\.?|serial\s*number|#)$/i.test(h));
+
+                                                return (
+                                                    <tr key={rowIndex} className="border-b border-border last:border-b-0 hover:bg-muted/20">
+                                                        <td className="p-3 text-center text-muted-foreground">{rowIndex + 1}</td>
+                                                        {displayHeaders.map((header, colIndex) => (
+                                                            <td key={header + colIndex} className="p-2 border-r border-border last:border-r-0 min-w-[150px]">
+                                                                <input
+                                                                    value={row[header] || ''}
+                                                                    onChange={(e) => handleStudentDataChange(rowIndex, header, e.target.value)}
+                                                                    className="w-full bg-transparent p-1 rounded hover:bg-background focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                                                                />
+                                                            </td>
+                                                        ))}
+
+                                                        {/* Dynamic CA Marks */}
+                                                        {courseAssessments.map((ca) => (
+                                                            <td key={`ca-cell-${rowIndex}-${ca.id}`} className="p-2 text-center border-r border-border font-medium text-blue-700 bg-blue-50/20">
+                                                                {calculateTotalMarks(rowIndex, ca)}
+                                                            </td>
+                                                        ))}
+
+                                                        {/* Dynamic QP Marks */}
+                                                        {questionPapers.map((qp) => (
+                                                            <td key={`qp-cell-${rowIndex}-${qp.id}`} className="p-2 text-center border-r border-border font-medium text-purple-700 bg-purple-50/20">
+                                                                {calculateTotalMarks(rowIndex, qp)}
+                                                            </td>
+                                                        ))}
+
+                                                        <td className="p-2 text-center">
+                                                            <button
+                                                                onClick={() => handleRemoveRow(rowIndex)}
+                                                                className="p-1 text-destructive hover:bg-destructive/10 rounded"
+                                                                title="Remove Row"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    No student data available. Upload an Excel file to populate this table or Retrieve existing data.
+                                </div>
+                            )}
+                        </CollapsibleSection>
                     </div>
                 </>
             ) : (

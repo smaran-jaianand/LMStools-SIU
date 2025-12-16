@@ -1,12 +1,21 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, FileText, Save, Edit } from 'lucide-react';
+import { Plus, Trash2, FileText, Save, Edit, ClipboardList } from 'lucide-react';
 import { useCourseStore } from '../../store/courseStore';
 import { getStudentDisplayInfo } from '../../utils/studentHelpers';
 import EmptyState from '../EmptyState';
 
 export default function CourseAssessment() {
-    // Using 'assessments' and 'assessmentMarks' instead of 'questions' and 'questionMarks'
-    const { courseDetails, studentData, assessments, setAssessments, assessmentMarks, setAssessmentMark } = useCourseStore();
+    const {
+        courseDetails,
+        studentData,
+        courseAssessments,
+        addCourseAssessment,
+        removeCourseAssessment,
+        updateAssessmentName,
+        setAssessmentQuestions,
+        setAssessmentMark
+    } = useCourseStore();
+
     const componentRef = useRef(null);
     const [isExporting, setIsExporting] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
@@ -14,27 +23,81 @@ export default function CourseAssessment() {
 
     // View state: 'list' -> 'options' -> 'builder' | 'marks'
     const [viewMode, setViewMode] = useState('list');
+    const [selectedAssessmentId, setSelectedAssessmentId] = useState(null);
 
-    const handleAssessmentChange = (id, field, value) => {
-        setAssessments(assessments.map(a =>
-            a.id === id ? { ...a, [field]: value } : a
-        ));
+    // Helpers to get current assessment data
+    const currentAssessment = selectedAssessmentId
+        ? courseAssessments.find(a => a.id === selectedAssessmentId)
+        : null;
+
+    const questions = currentAssessment ? currentAssessment.questions : [];
+    const assessmentMarks = currentAssessment ? currentAssessment.marks : {};
+
+    const handleQuestionChange = (id, field, value) => {
+        if (!currentAssessment) return;
+        const newQuestions = questions.map(q =>
+            q.id === id ? { ...q, [field]: value } : q
+        );
+        setAssessmentQuestions(currentAssessment.id, newQuestions);
     };
 
-    const addAssessment = () => {
-        setAssessments([...assessments, {
-            id: assessments.length + 1,
+    const addQuestion = () => {
+        if (!currentAssessment) return;
+        const newQuestions = [...questions, {
+            id: questions.length + 1,
             text: '',
             marks: '',
             co: '',
             bl: ''
-        }]);
+        }];
+        setAssessmentQuestions(currentAssessment.id, newQuestions);
     };
 
-    const removeAssessment = (index) => {
-        const newAssessments = assessments.filter((_, i) => i !== index);
-        setAssessments(newAssessments.map((a, i) => ({ ...a, id: i + 1 })));
+    const removeQuestion = (index) => {
+        if (!currentAssessment) return;
+        const newQuestions = questions.filter((_, i) => i !== index)
+            .map((q, i) => ({ ...q, id: i + 1 }));
+        setAssessmentQuestions(currentAssessment.id, newQuestions);
     };
+
+    const handleAddAssessment = () => {
+        const name = prompt("Enter Assessment Name (e.g., Unit Test 2):");
+        if (name) {
+            addCourseAssessment(name);
+        }
+    };
+
+    const handleDeleteAssessment = (e, id) => {
+        e.stopPropagation();
+        if (confirm("Are you sure you want to delete this assessment?")) {
+            removeCourseAssessment(id);
+            if (selectedAssessmentId === id) {
+                setViewMode('list');
+                setSelectedAssessmentId(null);
+            }
+        }
+    };
+
+    const handleEditName = (e, id, currentName) => {
+        // If called from NavBlock, e is event, id and currentName are provided
+        // If called from renderOptions/Builder/Marks, e is currentName, id is undefined
+        let assessmentIdToEdit = id;
+        let nameToEdit = currentName;
+
+        if (typeof e === 'string') { // This means e is actually the currentName when called from the new buttons
+            nameToEdit = e;
+            assessmentIdToEdit = currentAssessment?.id;
+        } else if (e && typeof e.stopPropagation === 'function') { // This means e is an event object
+            e.stopPropagation();
+        }
+
+        if (!assessmentIdToEdit || !nameToEdit) return;
+
+        const newName = prompt("Edit Assessment Name:", nameToEdit);
+        if (newName) {
+            updateAssessmentName(assessmentIdToEdit, newName);
+        }
+    }
 
     const handleExportPDF = async () => {
         if (!componentRef.current) return;
@@ -55,7 +118,7 @@ export default function CourseAssessment() {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'course-assessment.pdf';
+                a.download = `assessment-${currentAssessment?.name || 'export'}.pdf`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -72,11 +135,33 @@ export default function CourseAssessment() {
     };
 
     // Navigation Block Component
-    const NavBlock = ({ title, subtitle, icon: Icon, onClick }) => (
+    const NavBlock = ({ title, subtitle, icon: Icon, onClick, onDelete, onEdit }) => (
         <div
             onClick={onClick}
             className="bg-card hover:bg-accent/50 cursor-pointer border border-border p-6 rounded-lg shadow-sm transition-all group relative"
         >
+            {(onDelete || onEdit) && (
+                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {onEdit && (
+                        <button
+                            onClick={onEdit}
+                            className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                            title="Edit Name"
+                        >
+                            <Edit className="w-4 h-4" />
+                        </button>
+                    )}
+                    {onDelete && (
+                        <button
+                            onClick={onDelete}
+                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            )}
             <div className="flex items-center gap-4 mb-3">
                 <div className="p-3 bg-primary/10 rounded-full text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                     <Icon className="w-6 h-6" />
@@ -92,29 +177,65 @@ export default function CourseAssessment() {
     // --- VIEW Render Functions ---
 
     const renderList = () => (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <NavBlock
-                title="Course Assessment"
-                subtitle="Manage Assessment and Marks"
-                icon={FileText}
-                onClick={() => setViewMode('options')}
-            />
+        <div className="space-y-6">
+            <div className="flex justify-end">
+                <button
+                    onClick={handleAddAssessment}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
+                >
+                    <Plus size={16} /> Add New Assessment
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {courseAssessments.map(assessment => (
+                    <NavBlock
+                        key={assessment.id}
+                        title={assessment.name}
+                        subtitle="Manage Assessment and Marks"
+                        icon={ClipboardList}
+                        onClick={() => {
+                            setSelectedAssessmentId(assessment.id);
+                            setViewMode('options');
+                        }}
+                        onEdit={(e) => handleEditName(e, assessment.id, assessment.name)}
+                        onDelete={(e) => handleDeleteAssessment(e, assessment.id)}
+                    />
+                ))}
+                {courseAssessments.length === 0 && (
+                    <div className="col-span-full text-center py-10 text-muted-foreground">
+                        No assessments created. Click "Add New Assessment" to start.
+                    </div>
+                )}
+            </div>
         </div>
     );
 
     const renderOptions = () => (
         <div className="space-y-6">
             <div className="flex items-center gap-2">
-                <button onClick={() => setViewMode('list')} className="text-muted-foreground hover:text-primary">
+                <button onClick={() => {
+                    setViewMode('list');
+                    setSelectedAssessmentId(null);
+                }} className="text-muted-foreground hover:text-primary">
                     &larr; Back to List
                 </button>
-                <h2 className="text-xl font-semibold">Course Assessment</h2>
+                <div className="flex items-center gap-2 group">
+                    <h2 className="text-xl font-semibold">{currentAssessment?.name}</h2>
+                    <button
+                        onClick={() => handleEditName(currentAssessment?.name)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-opacity"
+                        title="Edit Name"
+                    >
+                        <Edit size={16} />
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <NavBlock
                     title="Assessment Builder"
-                    subtitle="Create and edit assessments"
+                    subtitle="Create and edit questions"
                     icon={Edit}
                     onClick={() => setViewMode('builder')}
                 />
@@ -135,7 +256,16 @@ export default function CourseAssessment() {
                     <button onClick={() => setViewMode('options')} className="text-muted-foreground hover:text-primary">
                         &larr; Back
                     </button>
-                    <h2 className="text-xl font-semibold">Assessment Builder</h2>
+                    <div className="flex items-center gap-2 group">
+                        <h2 className="text-xl font-semibold">{currentAssessment?.name} - Builder</h2>
+                        <button
+                            onClick={() => handleEditName(currentAssessment?.name)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-opacity"
+                            title="Edit Name"
+                        >
+                            <Edit size={16} />
+                        </button>
+                    </div>
                 </div>
                 <div className="flex gap-2">
                     {!isSaved ? (
@@ -163,7 +293,7 @@ export default function CourseAssessment() {
                     </button>
                     {!isSaved && (
                         <button
-                            onClick={addAssessment}
+                            onClick={addQuestion}
                             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
                         >
                             <Plus size={16} /> Add Question
@@ -185,16 +315,16 @@ export default function CourseAssessment() {
                         </tr>
                     </thead>
                     <tbody>
-                        {assessments.map((a, index) => (
+                        {questions.map((q, index) => (
                             <tr key={index}>
-                                <td className="border border-border p-3 font-medium">Q{a.id}</td>
+                                <td className="border border-border p-3 font-medium">Q{q.id}</td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 whitespace-pre-wrap">{a.text || '-'}</div>
+                                        <div className="p-2 whitespace-pre-wrap">{q.text || '-'}</div>
                                     ) : (
                                         <textarea
-                                            value={a.text}
-                                            onChange={(e) => handleAssessmentChange(a.id, 'text', e.target.value)}
+                                            value={q.text}
+                                            onChange={(e) => handleQuestionChange(q.id, 'text', e.target.value)}
                                             placeholder="Enter Question here..."
                                             className="w-full p-2 rounded-md border border-input bg-background min-h-[60px] resize-y"
                                         />
@@ -202,12 +332,12 @@ export default function CourseAssessment() {
                                 </td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 text-center">{a.marks || '-'}</div>
+                                        <div className="p-2 text-center">{q.marks || '-'}</div>
                                     ) : (
                                         <input
                                             type="number"
-                                            value={a.marks}
-                                            onChange={(e) => handleAssessmentChange(a.id, 'marks', e.target.value)}
+                                            value={q.marks}
+                                            onChange={(e) => handleQuestionChange(q.id, 'marks', e.target.value)}
                                             placeholder="Marks"
                                             className="w-full p-2 rounded-md border border-input bg-background"
                                         />
@@ -215,12 +345,12 @@ export default function CourseAssessment() {
                                 </td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 text-center">{a.co || '-'}</div>
+                                        <div className="p-2 text-center">{q.co || '-'}</div>
                                     ) : (
                                         <input
                                             type="text"
-                                            value={a.co}
-                                            onChange={(e) => handleAssessmentChange(a.id, 'co', e.target.value)}
+                                            value={q.co}
+                                            onChange={(e) => handleQuestionChange(q.id, 'co', e.target.value)}
                                             placeholder="e.g. CO1"
                                             className="w-full p-2 rounded-md border border-input bg-background"
                                         />
@@ -228,12 +358,12 @@ export default function CourseAssessment() {
                                 </td>
                                 <td className="border border-border p-3">
                                     {isSaved ? (
-                                        <div className="p-2 text-center">{a.bl || '-'}</div>
+                                        <div className="p-2 text-center">{q.bl || '-'}</div>
                                     ) : (
                                         <input
                                             type="text"
-                                            value={a.bl}
-                                            onChange={(e) => handleAssessmentChange(a.id, 'bl', e.target.value)}
+                                            value={q.bl}
+                                            onChange={(e) => handleQuestionChange(q.id, 'bl', e.target.value)}
                                             placeholder="e.g. L2"
                                             className="w-full p-2 rounded-md border border-input bg-background"
                                         />
@@ -242,7 +372,7 @@ export default function CourseAssessment() {
                                 <td className="border border-border p-3 text-center">
                                     {!isSaved && (
                                         <button
-                                            onClick={() => removeAssessment(index)}
+                                            onClick={() => removeQuestion(index)}
                                             className="text-destructive hover:bg-destructive/10 p-2 rounded-md"
                                         >
                                             <Trash2 size={18} />
@@ -264,7 +394,16 @@ export default function CourseAssessment() {
                     <button onClick={() => setViewMode('options')} className="text-muted-foreground hover:text-primary">
                         &larr; Back
                     </button>
-                    <h3 className="text-xl font-semibold">Student List vs Marks</h3>
+                    <div className="flex items-center gap-2 group">
+                        <h3 className="text-xl font-semibold">{currentAssessment?.name} - Marks</h3>
+                        <button
+                            onClick={() => handleEditName(currentAssessment?.name)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-opacity"
+                            title="Edit Name"
+                        >
+                            <Edit size={16} />
+                        </button>
+                    </div>
                 </div>
                 <div>
                     {!isMarksSaved ? (
@@ -295,9 +434,9 @@ export default function CourseAssessment() {
                                     <th className="p-3 text-left font-semibold border-r border-border">Roll Number</th>
                                     <th className="p-3 text-left font-semibold border-r border-border">Student Name</th>
                                     {/* Dynamic Assessment Columns */}
-                                    {assessments.map((a) => (
-                                        <th key={a.id} className="p-3 text-center font-semibold border-r border-border w-16">
-                                            Q{a.id} ({a.marks || '-'})
+                                    {questions.map((q) => (
+                                        <th key={q.id} className="p-3 text-center font-semibold border-r border-border w-16">
+                                            Q{q.id} ({q.marks || '-'})
                                         </th>
                                     ))}
                                 </tr>
@@ -311,15 +450,15 @@ export default function CourseAssessment() {
                                             <td className="p-3 border-r border-border">{rollNumber || '-'}</td>
                                             <td className="p-3 border-r border-border">{name || '-'}</td>
                                             {/* Dynamic Cells for Assessments */}
-                                            {assessments.map((a) => (
-                                                <td key={a.id} className="p-3 border-r border-border text-center min-w-[80px]">
+                                            {questions.map((q) => (
+                                                <td key={q.id} className="p-3 border-r border-border text-center min-w-[80px]">
                                                     {isMarksSaved ? (
-                                                        <span>{(assessmentMarks[i] && assessmentMarks[i][a.id]) || '-'}</span>
+                                                        <span>{(assessmentMarks[i] && assessmentMarks[i][q.id]) || '-'}</span>
                                                     ) : (
                                                         <input
                                                             type="number"
-                                                            value={(assessmentMarks[i] && assessmentMarks[i][a.id]) || ''}
-                                                            onChange={(e) => setAssessmentMark(i, a.id, e.target.value)}
+                                                            value={(assessmentMarks[i] && assessmentMarks[i][q.id]) || ''}
+                                                            onChange={(e) => setAssessmentMark(currentAssessment.id, i, q.id, e.target.value)}
                                                             className="w-full text-center p-1 border rounded-md"
                                                             placeholder=""
                                                         />
